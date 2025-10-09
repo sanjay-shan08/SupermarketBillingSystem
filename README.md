@@ -1,1 +1,2 @@
 # Billing-System
+<div>The Supermarket Billing System is a Java application that generates bills based on selected items and their quantities. It features product listing, price calculation, tax addition, and final invoice generation. This project is useful in retail settings for quick checkout processes and maintaining accurate sales records.</div>

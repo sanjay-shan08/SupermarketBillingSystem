@@ -1,134 +1,96 @@
-import java.util.*;
+import java.sql.*;
+import java.util.Scanner;
 
-public class SupermarketBillingSystem 
-{
-    static class Product 
-    {
-        String name;
-        double price;
+public class SupermarketBillingSystem {
 
-        Product(String name, double price) 
-        {
-            this.name = name;
-            this.price = price;
-        }
+    public static void main(String[] args) {
+        String url = "jdbc:mysql://localhost:3306/YOUR_DATABASE";
+        String user = "YOUR_USERNAME";
+        String password = "YOUR_PASSWORD";
+        Scanner scanner = new Scanner(System.in);
 
-        @Override
-        public String toString() 
-        {
-            return name;
-        }
+        try (Connection conn = DriverManager.getConnection(url, user, password)) {
 
-       
-        @Override
-        public boolean equals(Object o) 
-        {
-            if (this == o) return true;
-            if (!(o instanceof Product)) return false;
-            Product p = (Product) o;
-            return Objects.equals(name, p.name) && Double.compare(price, p.price) == 0;
-        }
+            // Display product list
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT ProductID, ProductName, Price, StockQuantity FROM Products");
 
-        @Override
-        public int hashCode() 
-        {
-            return Objects.hash(name, price);
-        }
-    }
-
-    private final Map<Integer, Product> productCatalog = new HashMap<>();
-    private final Map<Product, Integer> cart = new LinkedHashMap<>();
-    private final double TAX_RATE = 0.05; // 5% tax
-
-    public SupermarketBillingSystem() 
-    {
-        productCatalog.put(1, new Product("Milk", 24.50));
-        productCatalog.put(2, new Product("Bread", 15.00));
-        productCatalog.put(3, new Product("Eggs (dozen)", 60.00));
-        productCatalog.put(4, new Product("Butter", 40.00));
-        productCatalog.put(5, new Product("Rice (1kg)", 50.00));
-    }
-
-    void displayProducts() 
-    {
-        System.out.println("Available Products:");
-        for (Map.Entry<Integer, Product> entry : productCatalog.entrySet()) 
-        {
-            System.out.printf("%d. %s - ₹%.2f%n", entry.getKey(), entry.getValue().name, entry.getValue().price);
-        }
-    }
-
-    void addToCart(int productId, int quantity) 
-    {
-        Product product = productCatalog.get(productId);
-        if (product != null) 
-        {
-            if (quantity <= 0) 
-            {
-                System.out.println("Quantity must be positive.");
-                return;
+            System.out.println("Available Products:");
+            while (rs.next()) {
+                System.out.printf("%d. %s - ₹%.2f (Stock: %d)\n",
+                        rs.getInt("ProductID"),
+                        rs.getString("ProductName"),
+                        rs.getDouble("Price"),
+                        rs.getInt("StockQuantity"));
             }
-            cart.put(product, cart.getOrDefault(product, 0) + quantity);
-            System.out.printf("Added %d x %s to cart.%n", quantity, product.name);
-        } 
-        else 
-        {
-            System.out.println("Invalid product ID.");
-        }
-    }
 
-    void generateBill() 
-    {
-        System.out.println("\n------ Invoice ------");
-        double subtotal = 0;
-        for (Map.Entry<Product, Integer> entry : cart.entrySet()) 
-        {
-            Product product = entry.getKey();
-            int quantity = entry.getValue();
-            double totalPrice = product.price * quantity;
-            subtotal += totalPrice;
-            System.out.printf("%s x %d = ₹%.2f%n", product.name, quantity, totalPrice);
-        }
-        double tax = subtotal * TAX_RATE;
-        double total = subtotal + tax;
-        System.out.printf("Subtotal: ₹%.2f%n", subtotal);
-        System.out.printf("Tax (5%%): ₹%.2f%n", tax);
-        System.out.printf("Total: ₹%.2f%n", total);
-        System.out.println("--------------------");
-    }
+            // Select products for billing (simple cart logic)
+            int invoiceId = (int)(System.currentTimeMillis() / 1000); // unique invoice
+            double subtotal = 0;
+            while (true) {
+                System.out.print("Enter Product ID to add to cart (0 to finish): ");
+                int pid = scanner.nextInt();
+                if (pid == 0) break;
+                System.out.print("Enter quantity: ");
+                int quantity = scanner.nextInt();
 
-    public static void main(String[] args) 
-    {
-        Scanner sc = new Scanner(System.in);
-        SupermarketBillingSystem system = new SupermarketBillingSystem();
+                PreparedStatement pstmt = conn.prepareStatement(
+                        "SELECT Price, StockQuantity FROM Products WHERE ProductID = ?");
+                pstmt.setInt(1, pid);
+                ResultSet prs = pstmt.executeQuery();
+                if (!prs.next()) {
+                    System.out.println("Invalid Product ID.");
+                    continue;
+                }
+                double price = prs.getDouble("Price");
+                int stock = prs.getInt("StockQuantity");
+                if (quantity > stock) {
+                    System.out.println("Not enough stock!");
+                    continue;
+                }
 
-        while (true) 
-        {
-            system.displayProducts();
-            System.out.print("Enter product ID to add to cart (or 0 to checkout): ");
-            if (!sc.hasNextInt()) 
-            {
-                System.out.println("Please enter a valid integer.");
-                sc.next(); 
-                continue;
+                // Add to invoice items
+                PreparedStatement addInv = conn.prepareStatement(
+                    "INSERT INTO InvoiceItems (InvoiceID, ProductID, Quantity, Price) VALUES (?, ?, ?, ?)");
+                addInv.setInt(1, invoiceId);
+                addInv.setInt(2, pid);
+                addInv.setInt(3, quantity);
+                addInv.setDouble(4, price);
+                addInv.executeUpdate();
+
+                subtotal += price * quantity;
+
+                // Optional: Reduce stock quantity
+                PreparedStatement updStock = conn.prepareStatement(
+                    "UPDATE Products SET StockQuantity = StockQuantity - ? WHERE ProductID = ?");
+                updStock.setInt(1, quantity);
+                updStock.setInt(2, pid);
+                updStock.executeUpdate();
+
+                System.out.println("Added to cart.");
             }
-            int productId = sc.nextInt();
-            if (productId == 0) 
-            {
-                break;
-            }
-            System.out.print("Enter quantity: ");
-            if (!sc.hasNextInt()) 
-            {
-                System.out.println("Please enter a valid integer for quantity.");
-                sc.next(); 
-                continue;
-            }
-            int quantity = sc.nextInt();
-            system.addToCart(productId, quantity);
-        }
 
-        system.generateBill();
-        sc.close();
+            // Print Invoice
+            double tax = subtotal * 0.05; // 5% tax
+            double total = subtotal + tax;
+            System.out.println("\n----- Invoice -----");
+            PreparedStatement showInv = conn.prepareStatement(
+                "SELECT Products.ProductName, InvoiceItems.Quantity, InvoiceItems.Price FROM InvoiceItems JOIN Products ON InvoiceItems.ProductID = Products.ProductID WHERE InvoiceID = ?");
+            showInv.setInt(1, invoiceId);
+            ResultSet irs = showInv.executeQuery();
+            while (irs.next()) {
+                String pname = irs.getString("ProductName");
+                int qty = irs.getInt("Quantity");
+                double price = irs.getDouble("Price");
+                System.out.printf("%s x %d = ₹%.2f\n", pname, qty, price * qty);
+            }
+            System.out.printf("Subtotal: ₹%.2f\n", subtotal);
+            System.out.printf("Tax (5%%): ₹%.2f\n", tax);
+            System.out.printf("Total: ₹%.2f\n", total);
+            System.out.println("------------------");
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }

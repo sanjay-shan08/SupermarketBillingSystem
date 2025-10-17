@@ -5,8 +5,8 @@ public class SupermarketBillingSystem {
 
     public static void main(String[] args) {
         String url = "jdbc:mysql://localhost:3306/YOUR_DATABASE";
-        String user = "Admin";
-        String password = "pass123";
+        String user = "root";
+        String password = "Meena@9496";
         Scanner sc = new Scanner(System.in);
 
         try (Connection conn = DriverManager.getConnection(url, user, password)) {

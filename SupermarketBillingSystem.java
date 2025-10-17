@@ -5,9 +5,9 @@ public class SupermarketBillingSystem {
 
     public static void main(String[] args) {
         String url = "jdbc:mysql://localhost:3306/YOUR_DATABASE";
-        String user = "YOUR_USERNAME";
-        String password = "YOUR_PASSWORD";
-        Scanner scanner = new Scanner(System.in);
+        String user = "Admin";
+        String password = "pass123";
+        Scanner sc = new Scanner(System.in);
 
         try (Connection conn = DriverManager.getConnection(url, user, password)) {
 
@@ -29,10 +29,10 @@ public class SupermarketBillingSystem {
             double subtotal = 0;
             while (true) {
                 System.out.print("Enter Product ID to add to cart (0 to finish): ");
-                int pid = scanner.nextInt();
+                int pid = sc.nextInt();
                 if (pid == 0) break;
                 System.out.print("Enter quantity: ");
-                int quantity = scanner.nextInt();
+                int quantity = sc.nextInt();
 
                 PreparedStatement pstmt = conn.prepareStatement(
                         "SELECT Price, StockQuantity FROM Products WHERE ProductID = ?");
